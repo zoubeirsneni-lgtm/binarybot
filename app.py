@@ -59,8 +59,9 @@ elif menu == "⚙️ Créer une Stratégie":
             elif type_indic == "SMA (Mid Bollinger)":
                 lignes_generees.append({"id": f"sma_{idx}", "nom": f"SMA (Bollinger Mid) {params['periode']}", "type": "price_line"})
             elif type_indic == "Stochastique":
-                lignes_generees.append({"id": f"stoch_k_{idx}", "nom": f"Stoch K ({params['k']},{params['d']},{params['smooth']})", "type": "oscillateur"})
-                lignes_generees.append({"id": f"stoch_d_{idx}", "nom": f"Stoch D ({params['k']},{params['d']},{params['smooth']})", "type": "oscillateur"})
+                # CORRECTION 1 : L'ID correspond exactement au nom de la variable Pine Script générée
+                lignes_generees.append({"id": f"stoch_k_val_{idx}", "nom": f"Stoch K ({params['k']},{params['d']},{params['smooth']})", "type": "oscillateur"})
+                lignes_generees.append({"id": f"stoch_d_val_{idx}", "nom": f"Stoch D ({params['k']},{params['d']},{params['smooth']})", "type": "oscillateur"})
                 
             st.session_state.mes_indicateurs.append({"type": type_indic, "params": params, "lignes": lignes_generees})
             st.success(f"✅ {type_indic} ajouté !")
@@ -143,7 +144,7 @@ elif menu == "⚙️ Créer une Stratégie":
         st.markdown(f"⏱️ **Fenêtre :** `{log['fenetre']}` bougies.")
 
 
-# --- PAGE GÉNÉRATEUR (MIS À JOUR PINE SCRIPT V6) ---
+# --- PAGE GÉNÉRATEUR (CORRECTION FINALE V6) ---
 elif menu == "📜 Générer un Script":
     st.header("📜 Générateur de Code Pine Script v6")
     
@@ -183,11 +184,11 @@ elif menu == "📜 Générer un Script":
                 vars_calcul += f"sma_{i} = ta.sma(source_sma_{i}, periode_sma_{i})\n"
                 vars_plot += f"plot(sma_{i}, color=color.orange, title=\"SMA Mid {i+1}\")\n"
             elif ind["type"] == "Stochastique":
-                # MISE À JOUR POUR PINE SCRIPT V6 : ta.stoch n'accepte plus que 4 arguments
                 inputs_code += f"stoch_length_{i} = input.int({ind['params']['k']}, title=\"Stoch Length {i+1}\")\nstoch_smooth_k_{i} = input.int({ind['params']['smooth']}, title=\"Stoch Smooth K {i+1}\")\nstoch_smooth_d_{i} = input.int({ind['params']['d']}, title=\"Stoch Smooth D {i+1}\")\n"
                 vars_calcul += f"raw_stoch_{i} = ta.stoch(close, high, low, stoch_length_{i})\nstoch_k_val_{i} = ta.sma(raw_stoch_{i}, stoch_smooth_k_{i})\nstoch_d_val_{i} = ta.sma(stoch_k_val_{i}, stoch_smooth_d_{i})\n"
 
         # Assemblage du code final en Version 6
+        # CORRECTION 2 : On calcule les croisements AVANT les "if" pour éviter le warning CW10002
         code_pine = f"""//@version=6
 indicator("BinaryBot - Logique Complète", overlay=true)
 
@@ -198,15 +199,21 @@ indicator("BinaryBot - Logique Complète", overlay=true)
 // --- DESSIN ---
 {vars_plot}
 
+// --- DÉCLARATIONS DES CROISEMENTS ---
+dec_call_cross = ta.crossover({id_call_1}, {id_call_2})
+dec_put_cross  = ta.crossunder({id_put_1}, {id_put_2})
+conf_call_cross = ta.crossover({id_conf_call_1}, {id_conf_call_2})
+conf_put_cross  = ta.crossunder({id_conf_put_1}, {id_conf_put_2})
+
 // --- LOGIQUE SÉQUENTIELLE ---
 var int fenetre_call = 0
 var int fenetre_put = 0
 
 // 1. Déclencheurs
-if ta.crossover({id_call_1}, {id_call_2})
+if dec_call_cross
     fenetre_call := {fenetre}
 
-if ta.crossunder({id_put_1}, {id_put_2})
+if dec_put_cross
     fenetre_put := {fenetre}
 
 // 2. Mémoires
@@ -215,15 +222,15 @@ if fenetre_call > 0
 if fenetre_put > 0
     fenetre_put -= 1
 
-// 3. Confirmations EXPLICITES
+// 3. Confirmations
 signal_call = false
 signal_put = false
 
-if fenetre_call > 0 and ta.crossover({id_conf_call_1}, {id_conf_call_2})
+if fenetre_call > 0 and conf_call_cross
     signal_call := true
     fenetre_call := 0
 
-if fenetre_put > 0 and ta.crossunder({id_conf_put_1}, {id_conf_put_2})
+if fenetre_put > 0 and conf_put_cross
     signal_put := true
     fenetre_put := 0
 
