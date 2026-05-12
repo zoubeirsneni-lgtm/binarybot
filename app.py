@@ -24,17 +24,28 @@ if menu == "🏠 Accueil":
 elif menu == "⚙️ Créer une Stratégie":
     
     # ==========================================
-    # PARTIE 1 : LES INDICATEURS
+    # PARTIE 1 : LES INDICATEURS (CORRIGÉE)
     # ==========================================
     st.header("Étape 1 : Ajouter les Indicateurs")
     with st.form("formulaire_indicateur"):
         type_indic = st.selectbox("Choisir l'indicateur", ["EMA", "SMA (Mid Bollinger)", "Stochastique"])
         params = {}
         
-        if type_indic in ["EMA", "SMA (Mid Bollinger)"]:
+        # --- CAS 1 : L'EMA ---
+        if type_indic == "EMA":
             col1, col2 = st.columns(2)
-            params["periode"] = col1.number_input("Période", min_value=1, value=50 if type_indic == "EMA" else 5)
+            params["periode"] = col1.number_input("Période", min_value=1, value=50)
             params["source"] = col2.selectbox("Source", ["close", "open", "high", "low"])
+            
+        # --- CAS 2 : LA SMA (MID BOLLINGER) ---
+        elif type_indic == "SMA (Mid Bollinger)":
+            st.info("On ne garde que la ligne du milieu, mais on saisit les paramètres de la bande.")
+            col1, col2, col3 = st.columns(3)
+            params["periode"] = col1.number_input("Période (Length)", min_value=1, value=5)
+            params["mult"] = col2.number_input("Multiplicateur (StdDev)", min_value=0.1, value=1.0, step=0.1)
+            params["source"] = col3.selectbox("Source", ["close", "open", "high", "low"])
+            
+        # --- CAS 3 : LE STOCHASTIQUE ---
         elif type_indic == "Stochastique":
             col1, col2, col3 = st.columns(3)
             params["k"] = col1.number_input("K", min_value=1, value=14)
@@ -58,15 +69,13 @@ elif menu == "⚙️ Créer une Stratégie":
     st.markdown("---")
     
     # ==========================================
-    # PARTIE 2 : LA LOGIQUE SÉQUENTIELLE (NOUVEAU)
+    # PARTIE 2 : LA LOGIQUE SÉQUENTIELLE
     # ==========================================
     st.header("Étape 2 : Définir la Logique (Déclencheur & Confirmation)")
     
-    # On ne montre cette partie QUE s'il y a au moins 2 indicateurs (besoin d'un déclencheur et d'une confirmation)
     if len(st.session_state.mes_indicateurs) >= 1:
         with st.form("formulaire_logique"):
             st.subheader("1. Le Déclencheur (Trigger)")
-            # On crée une liste lisible pour l'utilisateur basée sur ce qu'il a ajouté
             choix_indicateurs = [f"{i['type']} ({i['params']})" for i in st.session_state.mes_indicateurs]
             
             col_dec1, col_dec2 = st.columns(2)
@@ -82,7 +91,6 @@ elif menu == "⚙️ Créer une Stratégie":
             confirmation_action = col_conf2.selectbox("Action", ["Croisement à la hausse", "Croisement à la baisse"])
             
             if st.form_submit_button("💾 Sauvegarder la logique"):
-                # On sauvegarde les choix dans la mémoire
                 st.session_state.logique_strategie = {
                     "declencheur": declencheur_indic,
                     "action_declencheur": declencheur_action,
@@ -94,7 +102,6 @@ elif menu == "⚙️ Créer une Stratégie":
     else:
         st.warning("⚠️ Ajoute au moins un indicateur dans l'Étape 1 pour pouvoir configurer la logique.")
 
-    # Affichage de la logique sauvegardée
     if st.session_state.logique_strategie:
         st.markdown("---")
         st.subheader("📋 Résumé de votre logique active :")
