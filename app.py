@@ -24,11 +24,15 @@ if menu == "🏠 Accueil":
 elif menu == "⚙️ Créer une Stratégie":
     
     # ==========================================
-    # PARTIE 1 : LES INDICATEURS (CORRIGÉE)
+    # PARTIE 1 : LES INDICATEURS (CORRIGÉ)
     # ==========================================
     st.header("Étape 1 : Ajouter les Indicateurs")
+    
+    # ATTENTION : LE SELECTBOX EST MAINTENANT EN DEHORS DU FORMULAIRE !
+    type_indic = st.selectbox("Choisir l'indicateur", ["EMA", "SMA (Mid Bollinger)", "Stochastique"])
+
+    # Le formulaire ne contient plus que les paramètres dynamiques
     with st.form("formulaire_indicateur"):
-        type_indic = st.selectbox("Choisir l'indicateur", ["EMA", "SMA (Mid Bollinger)", "Stochastique"])
         params = {}
         
         # --- CAS 1 : L'EMA ---
