@@ -59,7 +59,6 @@ elif menu == "⚙️ Créer une Stratégie":
             elif type_indic == "SMA (Mid Bollinger)":
                 lignes_generees.append({"id": f"sma_{idx}", "nom": f"SMA (Bollinger Mid) {params['periode']}", "type": "price_line"})
             elif type_indic == "Stochastique":
-                # CORRECTION 1 : L'ID correspond exactement au nom de la variable Pine Script générée
                 lignes_generees.append({"id": f"stoch_k_val_{idx}", "nom": f"Stoch K ({params['k']},{params['d']},{params['smooth']})", "type": "oscillateur"})
                 lignes_generees.append({"id": f"stoch_d_val_{idx}", "nom": f"Stoch D ({params['k']},{params['d']},{params['smooth']})", "type": "oscillateur"})
                 
@@ -144,14 +143,18 @@ elif menu == "⚙️ Créer une Stratégie":
         st.markdown(f"⏱️ **Fenêtre :** `{log['fenetre']}` bougies.")
 
 
-# --- PAGE GÉNÉRATEUR (CORRECTION FINALE V6) ---
+# --- PAGE GÉNÉRATEUR (MODE BACKTEST) ---
 elif menu == "📜 Générer un Script":
-    st.header("📜 Générateur de Code Pine Script v6")
+    st.header("📜 Générateur de Code Pine Script v6 (Mode Backtest)")
     
     if not st.session_state.mes_indicateurs or not st.session_state.logique_strategie:
         st.warning("⚠️ Tu dois d'abord configurer ta stratégie !")
     else:
-        st.success("Stratégie détectée !")
+        # NOUVEAU : Choix de l'expiration pour le backtest
+        st.info("💡 Pour le backtest, définis après combien de bougies l'option binaire expire (ferme le trade automatiquement).")
+        expiration_bougies = st.number_input("Expiration (en bougies)", min_value=1, max_value=20, value=3)
+        
+        st.success("Stratégie détectée ! Voici ton code de Backtest.")
         
         indicateurs = st.session_state.mes_indicateurs
         logique = st.session_state.logique_strategie
@@ -187,10 +190,9 @@ elif menu == "📜 Générer un Script":
                 inputs_code += f"stoch_length_{i} = input.int({ind['params']['k']}, title=\"Stoch Length {i+1}\")\nstoch_smooth_k_{i} = input.int({ind['params']['smooth']}, title=\"Stoch Smooth K {i+1}\")\nstoch_smooth_d_{i} = input.int({ind['params']['d']}, title=\"Stoch Smooth D {i+1}\")\n"
                 vars_calcul += f"raw_stoch_{i} = ta.stoch(close, high, low, stoch_length_{i})\nstoch_k_val_{i} = ta.sma(raw_stoch_{i}, stoch_smooth_k_{i})\nstoch_d_val_{i} = ta.sma(stoch_k_val_{i}, stoch_smooth_d_{i})\n"
 
-        # Assemblage du code final en Version 6
-        # CORRECTION 2 : On calcule les croisements AVANT les "if" pour éviter le warning CW10002
+        # NOUVEAU CODE : Utilisation de strategy() au lieu de indicator()
         code_pine = f"""//@version=6
-indicator("BinaryBot - Logique Complète", overlay=true)
+strategy("BinaryBot - Backtest", overlay=true, initial_capital=100, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
 
 // --- PARAMÈTRES ---
 {inputs_code}
@@ -209,35 +211,42 @@ conf_put_cross  = ta.crossunder({id_conf_put_1}, {id_conf_put_2})
 var int fenetre_call = 0
 var int fenetre_put = 0
 
-// 1. Déclencheurs
 if dec_call_cross
     fenetre_call := {fenetre}
-
 if dec_put_cross
     fenetre_put := {fenetre}
 
-// 2. Mémoires
 if fenetre_call > 0
     fenetre_call -= 1
 if fenetre_put > 0
     fenetre_put -= 1
 
-// 3. Confirmations
 signal_call = false
 signal_put = false
 
 if fenetre_call > 0 and conf_call_cross
     signal_call := true
     fenetre_call := 0
-
 if fenetre_put > 0 and conf_put_cross
     signal_put := true
     fenetre_put := 0
 
-// 4. AFFICHAGE
-plotshape(signal_call, title="Signal CALL", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal)
-plotshape(signal_put, title="Signal PUT", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal)
+// --- EXÉCUTION DES ORDRES (BACKTEST) ---
+// On entre en position au signal
+if signal_call
+    strategy.entry("CALL", strategy.long)
+if signal_put
+    strategy.entry("PUT", strategy.short)
+
+// --- GESTION DE L'EXPIRATION (SIMULATION OPTION BINAIRE) ---
+// On ferme le trade exactement X bougies après son ouverture
+if strategy.position_size > 0
+    strategy.close("CALL", when = bar_index >= strategy.opentrades.entry_bar_index(0) + {expiration_bougies})
+if strategy.position_size < 0
+    strategy.close("PUT", when = bar_index >= strategy.opentrades.entry_bar_index(0) + {expiration_bougies})
 """
         
         st.code(code_pine, language="pine")
-        st.info("Cliquez sur l'icône 'Copier' en haut à droite de la boîte noire ci-dessus.")
+        st.info("Cliquez sur l'icône 'Copier' en haut à droite.")
+        st.markdown("### 📊 Comment lire le Backtest :")
+        st.markdown("Une fois sur TradingView, regarde en bas dans l'onglet **'Testeur de stratégie'**. Cherche specifically la ligne **'Percent Profitable'** (Pourcentage de trades rentables). Si tu es au-dessus de **55%**, ta stratégie bat le marché des options binaires !")
