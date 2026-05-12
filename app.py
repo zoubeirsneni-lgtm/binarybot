@@ -240,10 +240,10 @@ if signal_put
 
 // --- GESTION DE L'EXPIRATION (SIMULATION OPTION BINAIRE) ---
 // On ferme le trade exactement X bougies après son ouverture
-if strategy.position_size > 0
-    strategy.close("CALL", when = bar_index >= strategy.opentrades.entry_bar_index(0) + {expiration_bougies})
-if strategy.position_size < 0
-    strategy.close("PUT", when = bar_index >= strategy.opentrades.entry_bar_index(0) + {expiration_bougies})
+if strategy.position_size > 0 and bar_index >= strategy.opentrades.entry_bar_index(0) + {expiration_bougies}
+    strategy.close("CALL")
+if strategy.position_size < 0 and bar_index >= strategy.opentrades.entry_bar_index(0) + {expiration_bougies}
+    strategy.close("PUT")
 """
         
         st.code(code_pine, language="pine")
