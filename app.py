@@ -46,9 +46,9 @@ elif menu == "⚙️ Créer une Stratégie":
             
         elif type_indic == "Stochastique":
             col1, col2, col3 = st.columns(3)
-            params["k"] = col1.number_input("K", min_value=1, value=14)
-            params["d"] = col2.number_input("D", min_value=1, value=17)
-            params["smooth"] = col3.number_input("Smooth", min_value=1, value=11)
+            params["k"] = col1.number_input("K (Length)", min_value=1, value=14)
+            params["d"] = col2.number_input("D (Smooth D)", min_value=1, value=17)
+            params["smooth"] = col3.number_input("Smooth K", min_value=1, value=11)
             
         if st.form_submit_button("➕ Ajouter à la stratégie"):
             lignes_generees = []
@@ -79,7 +79,7 @@ elif menu == "⚙️ Créer une Stratégie":
     st.markdown("---")
     
     # ==========================================
-    # PARTIE 2 : LA LOGIQUE (CORRIGÉE CALL / PUT CONFIRMATION)
+    # PARTIE 2 : LA LOGIQUE
     # ==========================================
     st.header("Étape 2 : Logique de Croisement")
     
@@ -91,14 +91,12 @@ elif menu == "⚙️ Créer une Stratégie":
     if len(options_lignes) >= 2:
         with st.form("formulaire_logique"):
             
-            # --- DÉCLENCHEUR CALL ---
             st.subheader("📈 Déclencheur CALL (Hausse)")
             c1, c2, c3 = st.columns([1,1,1])
             ligne_dec_call = c1.selectbox("Ligne 1", options_lignes, key="dec_call_1")
             c2.markdown("<br><h3 style='text-align:center; color:green'>CROISE À LA HAUSSE</h3><br>", unsafe_allow_html=True)
             ligne_dec_call_2 = c3.selectbox("Ligne 2", options_lignes, key="dec_call_2")
             
-            # --- DÉCLENCHEUR PUT ---
             st.subheader("📉 Déclencheur PUT (Baisse)")
             p1, p2, p3 = st.columns([1,1,1])
             ligne_dec_put = p1.selectbox("Ligne 1", options_lignes, key="dec_put_1")
@@ -107,20 +105,17 @@ elif menu == "⚙️ Créer une Stratégie":
             
             st.markdown("""<hr style="border: 2px solid gray; margin-top: 20px; margin-bottom: 20px;">""", unsafe_allow_html=True)
             
-            # --- FENÊTRE ---
             st.subheader("⏱️ Fenêtre de validité")
             fenetre = st.number_input("Combien de bougies max pour confirmer ?", min_value=1, max_value=10, value=3)
             
             st.markdown("""<hr style="border: 2px solid gray; margin-top: 20px; margin-bottom: 20px;">""", unsafe_allow_html=True)
 
-            # --- CONFIRMATION CALL ---
             st.subheader("✅ Confirmation pour le CALL")
             cc1, cc2, cc3 = st.columns([1,1,1])
             ligne_conf_call = cc1.selectbox("Conf. CALL Ligne 1", options_lignes, key="conf_call_1")
             cc2.markdown("<br><h3 style='text-align:center; color:green'>CROISE À LA HAUSSE</h3><br>", unsafe_allow_html=True)
             ligne_conf_call_2 = cc3.selectbox("Conf. CALL Ligne 2", options_lignes, key="conf_call_2")
 
-            # --- CONFIRMATION PUT ---
             st.subheader("✅ Confirmation pour le PUT")
             cp1, cp2, cp3 = st.columns([1,1,1])
             ligne_conf_put = cp1.selectbox("Conf. PUT Ligne 1", options_lignes, key="conf_put_1")
@@ -148,9 +143,9 @@ elif menu == "⚙️ Créer une Stratégie":
         st.markdown(f"⏱️ **Fenêtre :** `{log['fenetre']}` bougies.")
 
 
-# --- PAGE GÉNÉRATEUR ---
+# --- PAGE GÉNÉRATEUR (MIS À JOUR PINE SCRIPT V6) ---
 elif menu == "📜 Générer un Script":
-    st.header("📜 Générateur de Code Pine Script v5")
+    st.header("📜 Générateur de Code Pine Script v6")
     
     if not st.session_state.mes_indicateurs or not st.session_state.logique_strategie:
         st.warning("⚠️ Tu dois d'abord configurer ta stratégie !")
@@ -188,10 +183,12 @@ elif menu == "📜 Générer un Script":
                 vars_calcul += f"sma_{i} = ta.sma(source_sma_{i}, periode_sma_{i})\n"
                 vars_plot += f"plot(sma_{i}, color=color.orange, title=\"SMA Mid {i+1}\")\n"
             elif ind["type"] == "Stochastique":
-                inputs_code += f"stoch_k_{i} = input.int({ind['params']['k']}, title=\"Stoch K {i+1}\")\nstoch_d_{i} = input.int({ind['params']['d']}, title=\"Stoch D {i+1}\")\nstoch_smooth_{i} = input.int({ind['params']['smooth']}, title=\"Stoch Smooth {i+1}\")\n"
-                vars_calcul += f"[stoch_k_val_{i}, stoch_d_val_{i}] = ta.stoch(close, high, low, stoch_k_{i}, stoch_d_{i}, stoch_smooth_{i})\n"
+                # MISE À JOUR POUR PINE SCRIPT V6 : ta.stoch n'accepte plus que 4 arguments
+                inputs_code += f"stoch_length_{i} = input.int({ind['params']['k']}, title=\"Stoch Length {i+1}\")\nstoch_smooth_k_{i} = input.int({ind['params']['smooth']}, title=\"Stoch Smooth K {i+1}\")\nstoch_smooth_d_{i} = input.int({ind['params']['d']}, title=\"Stoch Smooth D {i+1}\")\n"
+                vars_calcul += f"raw_stoch_{i} = ta.stoch(close, high, low, stoch_length_{i})\nstoch_k_val_{i} = ta.sma(raw_stoch_{i}, stoch_smooth_k_{i})\nstoch_d_val_{i} = ta.sma(stoch_k_val_{i}, stoch_smooth_d_{i})\n"
 
-        code_pine = f"""//@version=5
+        # Assemblage du code final en Version 6
+        code_pine = f"""//@version=6
 indicator("BinaryBot - Logique Complète", overlay=true)
 
 // --- PARAMÈTRES ---
@@ -222,12 +219,10 @@ if fenetre_put > 0
 signal_call = false
 signal_put = false
 
-// Confirmation CALL (Uniquement si croisement à la hausse de la confirmation)
 if fenetre_call > 0 and ta.crossover({id_conf_call_1}, {id_conf_call_2})
     signal_call := true
     fenetre_call := 0
 
-// Confirmation PUT (Uniquement si croisement à la baisse de la confirmation)
 if fenetre_put > 0 and ta.crossunder({id_conf_put_1}, {id_conf_put_2})
     signal_put := true
     fenetre_put := 0
